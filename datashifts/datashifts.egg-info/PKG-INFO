@@ -1,0 +1,19 @@
+Metadata-Version: 2.1
+Name: datashifts
+Version: 0.0.1
+Summary: Quantify and analyze distribution shifts from samples.
+Author-email: Hongbo Chen <hongboc616@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/DataShifts/datashifts
+Project-URL: Bug Tracker, https://github.com/DataShifts/datashifts/issues
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Requires-Dist: numpy>=1.16
+Requires-Dist: pykeops>=2.2
+Requires-Dist: torch>=1.8
+Requires-Dist: geomloss>=0.2.6
+
+# datashifts
+Quantify and analyze distribution shifts from samples.
+ - Official Documentation Coming Soon!

@@ -1,0 +1,4 @@
+numpy>=1.16
+pykeops>=2.2
+torch>=1.8
+geomloss>=0.2.6

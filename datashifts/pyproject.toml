@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datashifts"
+version = "0.0.1"
+description = "Quantify and analyze distribution shifts from samples."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+  {name = "Hongbo Chen", email = "hongboc616@gmail.com"}
+]
+dependencies = [
+  "numpy>=1.16",
+  "pykeops>=2.2",
+  "torch>=1.8",
+  "geomloss>=0.2.6"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/DataShifts/datashifts"
+"Bug Tracker" = "https://github.com/DataShifts/datashifts/issues"

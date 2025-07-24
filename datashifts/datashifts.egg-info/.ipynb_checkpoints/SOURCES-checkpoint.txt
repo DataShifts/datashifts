@@ -1,0 +1,10 @@
+LICENSE.txt
+README.md
+pyproject.toml
+datashifts/__init__.py
+datashifts/core.py
+datashifts.egg-info/PKG-INFO
+datashifts.egg-info/SOURCES.txt
+datashifts.egg-info/dependency_links.txt
+datashifts.egg-info/requires.txt
+datashifts.egg-info/top_level.txt
