@@ -89,8 +89,7 @@ def check_class(x1, x2, y1, y2, weights1, weights2):
 
 def check_coupling_format(data1, data2, Dis, axis, N_max, dataname):
     if Dis!="L2":
-        pass
-        #raise ValueError("Currently the 'Dis_%s' value is only supported for 'L2', other distances will be supported in subsequent releases."%dataname)
+        raise ValueError("Currently the 'Dis_%s' value is only supported for 'L2', other distances will be supported in subsequent releases."%dataname)
     
     if Dis in ["L1","L2","inf"]:
         original_dis=True
@@ -232,10 +231,6 @@ def DataShifts(
                 x2:Union[Tensor,ndarray], 
                 y1:Union[Tensor,ndarray], 
                 y2:Union[Tensor,ndarray], 
-                Dis_x:Union[str,Callable]="L2", 
-                Dis_y:Union[str,Callable]="L2", 
-                axis_x:Optional[int]=None, 
-                axis_y:Optional[int]=None, 
                 weights1:Union[Tensor,ndarray]=None, 
                 weights2:Union[Tensor,ndarray]=None, 
                 eps:float=0.01, 
@@ -252,11 +247,11 @@ def DataShifts(
     #axis_y:Optional[int]=None, 
     #KeOps:Optional[bool]=None, 
     
-    #Dis_x="L2"
-    #Dis_y="L2"
-    #axis_x=None
-    #axis_y=None
-    #KeOps=None
+    Dis_x="L2"
+    Dis_y="L2"
+    axis_x=None
+    axis_y=None
+    KeOps=None
     
     #Perform class validation and gradient clipping.
     x1_, x2_, y1_, y2_, weights1_, weights2_, requires_grad=check_class(x1, x2, y1, y2, weights1, weights2)
