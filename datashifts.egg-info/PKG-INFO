@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: datashifts
-Version: 0.0.1
+Version: 0.0.2
 Summary: Quantify and analyze distribution shifts from samples.
 Author-email: Hongbo Chen <hongboc616@gmail.com>
 License: MIT

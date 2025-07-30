@@ -8,3 +8,8 @@ datashifts.egg-info/SOURCES.txt
 datashifts.egg-info/dependency_links.txt
 datashifts.egg-info/requires.txt
 datashifts.egg-info/top_level.txt
+datashifts.egg-info/.ipynb_checkpoints/PKG-INFO-checkpoint
+datashifts.egg-info/.ipynb_checkpoints/SOURCES-checkpoint.txt
+datashifts.egg-info/.ipynb_checkpoints/dependency_links-checkpoint.txt
+datashifts.egg-info/.ipynb_checkpoints/requires-checkpoint.txt
+datashifts.egg-info/.ipynb_checkpoints/top_level-checkpoint.txt
