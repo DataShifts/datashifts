@@ -122,7 +122,7 @@ def check_coupling_format(data1, data2, Dis, axis, N_max, dataname):
             batchs=1
         estimated_space=4*min(N_data1,N_max)*min(N_data2,N_max)*dim*batchs
         if torch.cuda.is_available():
-            allowed_space=1024**3
+            allowed_space=1024**3 
             if estimated_space<=allowed_space:
                 KeOps=False
             else:
@@ -239,7 +239,94 @@ def DataShifts(
                 seed:Optional[int]=None, 
                 verbose:bool=True, 
               ):
-    #Given two data sets that share the same space but follow different distributions, compute the covariate shift and the concept shift.
+    r"""
+    Compute covariate shift and concept shift between two labeled sample sets.
+
+    This routine estimates, from finite samples, (i) the **covariate shift** in the
+    X-space and (ii) the **concept shift** in the Y|X-space between two
+    distributions. Covariate shift is computed as the **entropic optimal transport**
+    in the feature space; concept shift is computed as the **expected label-space 
+    distance under the entropic optimal transport coupling** inferred from dual 
+    Sinkhorn potentials. The function supports batching, importance weights, 
+    automatic sub-sampling for scalability, and transparent GPU execution.
+
+    Parameters
+    ----------
+    x1, x2 : torch.Tensor or numpy.ndarray
+        Covariate samples from the two domains. Shapes accepted:
+        ``(Batch, Num, Dim_x)`` or ``(Num, Dim_x)``. Batch dimensions of `x1` and
+        `x2` must match, and their last (feature) dimensions must be equal.
+    y1, y2 : torch.Tensor or numpy.ndarray
+        Corresponding label samples. Shapes accepted:
+        ``(Batch, Num, Dim_y)`` or ``(Num, Dim_y)``. Must match `x*` in both
+        ``Batch`` and ``Num``. If the label space is effectively 1-D, a singleton
+        dimension is added internally for consistency.
+    weights1, weights2 : torch.Tensor or numpy.ndarray, optional
+        Optional per-sample weights with shapes ``(Batch, Num)`` or ``(Num,)``.
+        If provided, they are validated to be non-negative and are **normalized
+        per batch** internally to sum to 1. If omitted, uniform weights are used.
+    eps : float, default 0.01
+        Entropic regularization for optimal transport; smaller is more faithful but
+        slower/noisier, larger is smoother/faster.
+    N_max : int, default 5000
+        Upper bound on the number of samples retained per domain. If
+        ``Num > N_max``, the data are **shuffled** and (weighted) **sub-sampled
+        without replacement**. Shuffling is applied even without sub-sampling to 
+        avoid group-specific bias.
+    device : {"cpu","cuda","gpu"} or None, default None
+        Target device. If ``None``, the routine uses CUDA automatically when
+        available (and prints a note if all inputs were on CPU).
+    seed : int or None, default None
+        Random seed for shuffling/sampling. Two independent RNGs are used
+        (one per domain) for reproducible yet uncorrelated draws.
+    verbose : bool, default True
+        Whether to print informative messages (sampling strategy, auto-device).
+
+    Returns
+    -------
+    covariate_shift : torch.Tensor
+        Debiased entropic optimal transport ``W_1^deb(x1,x2)`` in X-space. The tensor has
+        shape ``Batch`` (or is a scalar 0-D tensor if there is no batch).
+    concept_shift : torch.Tensor
+        Expected label-space distance under the optimal coupling. Same shape semantics as above.
+
+    Algorithmic details
+    -------------------
+    * **Covariate shift** uses a debiased entropic optimal transport (p=1), implemented by
+      combining OT costs on random splits to remove entropic bias.
+    * **Concept shift** first fits dual potentials (with entropic OT, p=1), turns
+      them into a soft coupling ``π* = w1 · exp((g1 − C_x + g2)/eps) · w2``, then
+      averages Euclidean distances in Y-space under ``π*``.
+    * The routine heuristically selects a **KeOps LazyTensor** backend for large
+      problems to control memory, otherwise uses dense tensors on GPU/CPU.
+
+    Notes
+    -----
+    * **Distance metric:** currently **Euclidean ("L2")** is the only built-in
+      metric for both X and Y; hooks for user-defined metrics are in place and will
+      be enabled in a future release.
+    * **Gradients:** all inputs are detached; this function is intended for
+      measurement/diagnostics rather than backpropagation through OT.
+    * **Shapes:** both outputs follow the leading batch dimensions of the inputs.
+
+    Raises
+    ------
+    TypeError
+        If `eps`/`N_max` are non-numeric; if any input is neither a Tensor nor a
+        NumPy array; if `verbose` is not bool; or for invalid custom-metric handles.
+    ValueError
+        If sample counts are below the global minimum; if shapes are inconsistent
+        between domains or between X and Y; if weights have negatives or are all 0;
+        or if an unsupported distance is requested.
+    RuntimeError
+        If a user-provided distance function (future pathway) raises during checks.
+
+    Examples
+    --------
+    >>> covariate_shift, concept_shift = DataShifts(x1, x2, y1, y2, N_max=2048, eps=0.01)
+    >>> covariate_shift, concept_shift
+    (tensor(..., device='cuda:0'), tensor(..., device='cuda:0'))
+    """
     
     #Dis_x:Union[str,Callable]="L2", 
     #Dis_y:Union[str,Callable]="L2", 

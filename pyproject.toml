@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "datashifts"
-version = "0.0.2.1"
+version = "0.8.0"
 description = "Quantify and analyze distribution shifts from samples."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -18,6 +18,9 @@ dependencies = [
   "torch>=1.8",
   "geomloss>=0.2.6"
 ]
+
+[tool.setuptools]
+packages = ["datashifts"]
 
 [project.urls]
 "Homepage" = "https://github.com/DataShifts/datashifts"

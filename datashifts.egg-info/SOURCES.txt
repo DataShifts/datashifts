@@ -1,4 +1,4 @@
-LICENSE.txt
+LICENSE
 README.md
 pyproject.toml
 datashifts/__init__.py
