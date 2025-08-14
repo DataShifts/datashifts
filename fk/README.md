@@ -6,7 +6,7 @@ $$
 \epsilon _B(h)\le \epsilon _A(h)+L _hL _{\ell}'S _{Cov}+L _{\ell}S _{Cpt}^{\gamma ^*}
 $$
 
-where $\epsilon _A(h), \epsilon _B(h)$ are the errors of hypothesis $h$ under the distributions $\mathcal{D} _{XY}^{A}, \mathcal{D} _{XY}^{B}$, respectively. $S _{Cov}, S _{Cpt}^{\gamma ^*}$ are **covariate shift** (=$X$ shift, distribution shift of covariates) and **concept shift** (=$Y|X$ shift, distribution shift of labels conditioned on covariates) between $\mathcal{D} _{XY}^{A}, \mathcal{D} _{XY}^{B}$. Both shifts are defined in closed form via **entropic optimal transport**.
+where $\epsilon _A(h), \epsilon _B(h)$ are the errors of hypothesis $h$ under the distributions $\mathcal{D} _{XY}^{A}, \mathcal{D} _{XY}^{B}$, respectively. $S _{Cov}, S _{Cpt}^{\gamma ^*}$ are **covariate shift** (= $X$ shift, distribution shift of covariates) and **concept shift** (= $Y|X$ shift, distribution shift of labels conditioned on covariates) between $\mathcal{D} _{XY}^{A}, \mathcal{D} _{XY}^{B}$. Both shifts are defined in closed form via **entropic optimal transport**.
 
 This elegant theory shows how distribution shifts affect the error, and has the following advantages:
 
