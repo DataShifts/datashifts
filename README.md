@@ -20,7 +20,7 @@ DataShifts is a Python package that makes it simple to **measure and analyze the
 
 * *How do these distribution shifts affect model performance?*
 
-In analysis, distribution shift is often decomposed into **covariate shift ($X$ shift)** and **concept shift (=$Y|X$ shift)**. The general theory below shows that the error bound **scales linearly with** these two shifts. With a single call, **DataShifts** estimates these two shifts from labeled samples, providing a rigorous and general tool for quantifying and analyzing distribution shift.
+In analysis, distribution shift is often decomposed into **covariate shift ($X$ shift)** and **concept shift ($Y|X$ shift)**. The general theory below shows that the error bound **scales linearly with** these two shifts. With a single call, **DataShifts** estimates these two shifts from labeled samples, providing a rigorous and general tool for quantifying and analyzing distribution shift.
 
 ---
 
