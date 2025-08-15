@@ -1,6 +1,6 @@
 
 
-![DataShifts Logo](https://github.com/DataShifts/datashifts/blob/main/logo/datashifts.svg)
+<img src="/logo/datashifts.svg" width="900">
 
 
 
@@ -29,6 +29,7 @@ In analysis, distribution shift is often decomposed into **covariate shift ($X$ 
 Let the covariate and label spaces be metric spaces $(\mathcal{X} ,\rho _{\mathcal{X}}),(\mathcal{Y} ,\rho _{\mathcal{Y}})$, and $\mathcal{D} _{XY}^{A}, \mathcal{D} _{XY}^{B}$ are two joint distributions of covariates and labels on $\mathcal{X}\times\mathcal{Y}$. If the hypothesis $h:\mathcal{X} \rightarrow \mathcal{Y}'$ is $L _h$-Lipschitz continuous, loss $\ell :\mathcal{Y} \times \mathcal{Y} '\rightarrow \mathbb{R}$ is separately $(L _{\ell},L _{\ell}')$-Lipschitz continuous, then:
 
 $$
+\large
 \epsilon _B(h)\le \epsilon _A(h)+L _hL _{\ell}'S _{Cov}+L _{\ell}S _{Cpt}^{\gamma ^*}
 $$
 
