@@ -1,7 +1,8 @@
-![DataShifts Logo](/logo/datashifts.svg)
 
-<img src="logo/datashifts.svg" width="300">
 
+<picture align="center">
+  <img alt="DataShifts Logo" src="logo/datashifts.svg" width="900">
+</picture>
 
 
 
