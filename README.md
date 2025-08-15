@@ -1,7 +1,7 @@
 <br>
 
 <p align="center">
-  <img alt="DataShifts Logo" src="https://raw.githubusercontent.com/DataShifts/datashifts/main/logo/datashifts.svg" width="790">
+  <img alt="DataShifts Logo" src="https://raw.githubusercontent.com/DataShifts/datashifts/main/logo/datashifts.svg" width="770">
 </p>
 
 <br>
