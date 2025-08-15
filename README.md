@@ -1,8 +1,8 @@
 
 
-<picture align="center">
-  <img alt="DataShifts Logo" src="logo/datashifts.svg" width="700">
-</picture>
+<div style="text-align:center">
+  <img alt="DataShifts Logo" src="logo/datashifts.svg" width="800">
+</div>
 
 
 
