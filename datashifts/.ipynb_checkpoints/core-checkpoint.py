@@ -24,9 +24,14 @@ def default_distance_expansion(A, B, KeOps):
         B_expand = packer(B.unsqueeze(dim-2))  # (..B,1,M,D)
     return A_expand, B_expand
 
-def Euclidean_distance(A, B, KeOps=True):
+def Euclidean_distance(A, B, KeOps=True, p=1):
     A_expand, B_expand=default_distance_expansion(A, B, KeOps)
-    return ((A_expand - B_expand) ** 2).sum(-1) ** (1 / 2)
+    if p==1:
+        return ((A_expand - B_expand) ** 2).sum(-1) ** (1 / 2)
+    elif p==2:
+        return ((A_expand - B_expand) ** 2).sum(-1)/2
+    else:
+        raise ValueError("The value of 'p' can only be 1 or 2.")
 
 def Manhattan_distance(A, B, KeOps=True):
     A_expand, B_expand=default_distance_expansion(A, B, KeOps)
@@ -60,6 +65,52 @@ def W1_deb(x1, x2, w1, w2, eps=0.01):
     W1_deb=abs(W_x12_1**2/2+W_x12_2**2/2-W_x11**2/2-W_x22**2/2)**(1/2)
     return W1_deb
 
+def W2_deb(x1, x2, w1, w2, eps=0.01):
+    loss = SamplesLoss(loss="sinkhorn", p=2, blur=eps**(1/2), debias=True, scaling=0.9**(1/2))
+    index1=int(x1.shape[-2]/2)
+    index2=int(x2.shape[-2]/2)
+    dim_batch=len(w1.shape)-1
+    idx11=(slice(None),)*dim_batch+(slice(None,index1),)
+    idx12=(slice(None),)*dim_batch+(slice(index1,None),)
+    idx21=(slice(None),)*dim_batch+(slice(None,index2),)
+    idx22=(slice(None),)*dim_batch+(slice(index2,None),)
+    x11,x12=x1[idx11],x1[idx12]
+    x21,x22=x2[idx21],x2[idx22]
+    w11,w12=w1[idx11],w1[idx12]
+    w21,w22=w2[idx21],w2[idx22]
+    w11=w11/(w11.sum(axis=-1).unsqueeze(-1))
+    w12=w12/(w12.sum(axis=-1).unsqueeze(-1))
+    w21=w21/(w21.sum(axis=-1).unsqueeze(-1))
+    w22=w22/(w22.sum(axis=-1).unsqueeze(-1))
+    W_x12_1=loss(w11, x11, w21, x21)
+    W_x12_2=loss(w12, x12, w22, x22)
+    W_x11=loss(w11, x11, w12, x12)
+    W_x22=loss(w21, x21, w22, x22)
+    W2_deb=abs(W_x12_1+W_x12_2-W_x11-W_x22)**(1/2)
+    return W2_deb
+
+def directional_derivative(x1, x2, x1_grad, x2_grad):
+    x1_,x2_=default_distance_expansion(x1, x2, KeOps=True)
+    diff=x1_-x2_
+    dis=(diff**2).sum(-1)**(1/2)+1e-9    #For now, only use European distances.
+    direction_vector=diff/dis
+    if x1_grad is not None and x2_grad is not None:
+        x1_grad_,x2_grad_=default_distance_expansion(x1_grad, x2_grad, KeOps=True)
+        x1_dir_d=(x1_grad_*direction_vector).sum(-1).abs()
+        x2_dir_d=(x2_grad_*direction_vector).sum(-1).abs()
+        dir_d=(x1_dir_d.concat(x2_dir_d)).max(-1)
+    else:
+        if x1_grad is not None:
+            dim=x1_grad.dim()
+            grad_=LazyTensor(x1_grad.unsqueeze(dim-1)) if dim >= 2 else LazyTensor(x1_grad[:, None, None])
+        elif x2_grad is not None:
+            dim=x2_grad.dim()
+            grad_=LazyTensor(x2_grad.unsqueeze(dim-2)) if dim >= 2 else LazyTensor(x2_grad[None, :, None])
+        else:
+            raise ValueError("The input values 'x1_grad' and 'x2_grad' cannot both be None.")
+        dir_d=(grad_*direction_vector).sum(-1).abs()
+    return dir_d
+
 def ensure_no_grad(x, dataname):
     if isinstance(x, Tensor):
         if x.requires_grad:
@@ -71,7 +122,7 @@ def ensure_no_grad(x, dataname):
     else:
         raise TypeError("'%s' must be an instance of either torch.Tensor or numpy.ndarray."%dataname)
 
-def check_class(x1, x2, y1, y2, weights1, weights2):
+def check_class(x1, x2, y1, y2, weights1, weights2, grad1, grad2):
     requires_grad={}
     x1_,requires_grad["x1"]=ensure_no_grad(x1, "x1")
     x2_,requires_grad["x2"]=ensure_no_grad(x2, "x2")
@@ -85,7 +136,15 @@ def check_class(x1, x2, y1, y2, weights1, weights2):
         weights2_,requires_grad["weights2"]=None,None
     else:
         weights2_,requires_grad["weights2"]=ensure_no_grad(weights2, "weights2")
-    return x1_, x2_, y1_, y2_, weights1_, weights2_, requires_grad
+    if grad1 is None:
+        grad1_,requires_grad["grad1"]=None,None
+    else:
+        grad1_,requires_grad["grad1"]=ensure_no_grad(grad1, "grad1")
+    if grad2 is None:
+        grad2_,requires_grad["grad2"]=None,None
+    else:
+        grad2_,requires_grad["grad2"]=ensure_no_grad(grad2, "grad2")
+    return x1_, x2_, y1_, y2_, weights1_, weights2_, grad1_, grad2_, requires_grad
 
 def check_coupling_format(data1, data2, Dis, axis, N_max, dataname):
     if Dis!="L2":
@@ -122,7 +181,7 @@ def check_coupling_format(data1, data2, Dis, axis, N_max, dataname):
             batchs=1
         estimated_space=4*min(N_data1,N_max)*min(N_data2,N_max)*dim*batchs
         if torch.cuda.is_available():
-            allowed_space=1024**3 
+            allowed_space=1024**3
             if estimated_space<=allowed_space:
                 KeOps=False
             else:
@@ -233,6 +292,9 @@ def DataShifts(
                 y2:Union[Tensor,ndarray], 
                 weights1:Union[Tensor,ndarray]=None, 
                 weights2:Union[Tensor,ndarray]=None, 
+                grad1:Union[Tensor,ndarray]=None, 
+                grad2:Union[Tensor,ndarray]=None, 
+                P:int=1, 
                 eps:float=0.01, 
                 N_max:int=5000, 
                 device:Optional[str]=None, 
@@ -265,6 +327,12 @@ def DataShifts(
         Optional per-sample weights with shapes ``(Batch, Num)`` or ``(Num,)``.
         If provided, they are validated to be non-negative and are **normalized
         per batch** internally to sum to 1. If omitted, uniform weights are used.
+    grad1, grad2 : torch.Tensor or numpy.ndarray, optional
+        The gradient of `x*` with respect to the error, used to compute the factor
+        of the covariate shift's effect on the error, and returned as `covariate_factor`.
+        The shape must correspond to `x*`.
+    P : int, 1 or 2, default 1
+        The order of entropic optimal transport.
     eps : float, default 0.01
         Entropic regularization for optimal transport; smaller is more faithful but
         slower/noisier, larger is smoother/faster.
@@ -285,29 +353,27 @@ def DataShifts(
     Returns
     -------
     covariate_shift : torch.Tensor
-        Debiased entropic optimal transport ``W_1^deb(x1,x2)`` in X-space. The tensor has
-        shape ``Batch`` (or is a scalar 0-D tensor if there is no batch).
+        Debiased entropic optimal transport ``W_1^deb(x1,x2)`` or ``W_2^deb(x1,x2)`` in X-space.
+        The tensor has shape ``Batch`` (or is a scalar 0-D tensor if there is no batch).
     concept_shift : torch.Tensor
         Expected label-space distance under the optimal coupling. Same shape semantics as above.
-
-    Algorithmic details
-    -------------------
-    * **Covariate shift** uses a debiased entropic optimal transport (p=1), implemented by
-      combining OT costs on random splits to remove entropic bias.
-    * **Concept shift** first fits dual potentials (with entropic OT, p=1), turns
-      them into a soft coupling ``π* = w1 · exp((g1 − C_x + g2)/eps) · w2``, then
-      averages Euclidean distances in Y-space under ``π*``.
-    * The routine heuristically selects a **KeOps LazyTensor** backend for large
-      problems to control memory, otherwise uses dense tensors on GPU/CPU.
+    covariate_factor : torch.Tensor
+        If `grad*` is provided, the estimated factor of the covariate shift's effect on the
+        error is returned.
 
     Notes
     -----
     * **Distance metric:** currently **Euclidean ("L2")** is the only built-in
       metric for both X and Y; hooks for user-defined metrics are in place and will
       be enabled in a future release.
-    * **Gradients:** all inputs are detached; this function is intended for
-      measurement/diagnostics rather than backpropagation through OT.
+    * **Covariate shift** uses a debiased entropic optimal transport (P=1 or 2), implemented by
+      combining OT costs on random splits to remove bias.
+    * **Concept shift** first fits dual potentials (with entropic OT, P=1 or 2), turns
+      them into a soft coupling ``π* = w1 · exp((g1 − C_x + g2)/eps) · w2``, then
+      averages distances in Y-space under ``π*``.
     * **Shapes:** both outputs follow the leading batch dimensions of the inputs.
+    * The routine heuristically selects a **KeOps LazyTensor** backend for large
+      problems to control memory, otherwise uses dense tensors on GPU/CPU.
 
     Raises
     ------
@@ -340,8 +406,8 @@ def DataShifts(
     axis_y=None
     KeOps=None
     
-    #Perform class validation and gradient clipping.
-    x1_, x2_, y1_, y2_, weights1_, weights2_, requires_grad=check_class(x1, x2, y1, y2, weights1, weights2)
+    #Perform class validation and gradient detachment for all tensor inputs.
+    x1_, x2_, y1_, y2_, weights1_, weights2_, grad1_, grad2_, requires_grad=check_class(x1, x2, y1, y2, weights1, weights2, grad1, grad2,)
     #Verify that N_max is numeric and that N_max ≥ N_min.
     if isinstance(N_max, float) or isinstance(N_max, int):
         N_max=int(N_max)
@@ -381,15 +447,22 @@ def DataShifts(
     if weights1_ is not None:
         shape_weights1=tuple(weights1_.shape)
         if shape_weights1[:-1]!=shape_batch:
-            raise ValueError("'weights1' must each have shape (Batch_size, Num_samples) or (Num_samples), and its 'Batch_size' must be identical to 'x1'.")
+            raise ValueError("'weights1' must have shape (Batch_size, Num_samples) or (Num_samples), and its 'Batch_size' must be identical to 'x1'.")
         if shape_weights1[-1]!=N1:
-            raise ValueError("'weights1' must each have shape (Batch_size, Num_samples) or (Num_samples), and its 'Num_samples' must be identical to 'x1'.")
+            raise ValueError("'weights1' must have shape (Batch_size, Num_samples) or (Num_samples), and its 'Num_samples' must be identical to 'x1'.")
     if weights2_ is not None:
         shape_weights2=tuple(weights2_.shape)
         if shape_weights2[:-1]!=shape_batch:
-            raise ValueError("'weights2' must each have shape (Batch_size, Num_samples) or (Num_samples), and its 'Batch_size' must be identical to 'x2'.")
+            raise ValueError("'weights2' must have shape (Batch_size, Num_samples) or (Num_samples), and its 'Batch_size' must be identical to 'x2'.")
         if shape_weights2[-1]!=N2:
-            raise ValueError("'weights2' must each have shape (Batch_size, Num_samples) or (Num_samples), and its 'Num_samples' must be identical to 'x2'.")
+            raise ValueError("'weights2' must have shape (Batch_size, Num_samples) or (Num_samples), and its 'Num_samples' must be identical to 'x2'.")
+    #If grad1 or grad2 is provided, verify that its shape match x1 or x2.
+    if grad1_ is not None:
+        if tuple(grad1_.shape)!=tuple(x1_.shape):
+            raise ValueError("'grad1' must have the same shape as 'x1'.")
+    if grad2_ is not None:
+        if tuple(grad2_.shape)!=tuple(x2_.shape):
+            raise ValueError("'grad2' must have the same shape as 'x2'.")
     #Handle the random seed.
     if isinstance(weights1_, Tensor):
         g_device=weights1_.device
@@ -417,7 +490,7 @@ def DataShifts(
     if torch.cuda.is_available():
         if device is None:
             Cuda=True
-            any_on_gpu=any(isinstance(t, torch.Tensor) and t.is_cuda for t in (x1_, x2_, y1_, y2_, weights1_, weights2_))
+            any_on_gpu=any(isinstance(t, torch.Tensor) and t.is_cuda for t in (x1_, x2_, y1_, y2_, weights1_, weights2_, grad1_, grad2_,))
             if verbose and not any_on_gpu:  #Report only when all tensors are on the CPU.
                 print("Automatically use the GPU for computation.")
         elif device[:4].lower() in ["gpu","cuda"]:
@@ -426,6 +499,7 @@ def DataShifts(
             Cuda=False
     else:
         Cuda=False
+    #Perform indexing to obtain the data ultimately used by the algorithm.
     if original_dis_x:
         x1_used=one_dimension_indexing(x1_,index1,len(shape_batch))
         x2_used=one_dimension_indexing(x2_,index2,len(shape_batch))
@@ -441,11 +515,18 @@ def DataShifts(
         x2_used=tensorized(x2_used,Cuda)
         weights1_used=tensorized(weights1_used,Cuda)
         weights2_used=tensorized(weights2_used,Cuda)
+        if grad1_ is not None:
+            grad1_used=one_dimension_indexing(grad1_,index1,len(shape_batch))
+            grad1_used=tensorized(grad1_used,Cuda)
+        else:
+            grad1_used=None
+        if grad2_ is not None:
+            grad2_used=one_dimension_indexing(grad2_,index2,len(shape_batch))
+            grad2_used=tensorized(grad2_used,Cuda)
+        else:
+            grad2_used=None
     else:
         pass
-    #Normalize the weights.
-    weights1_used=weights1_used/(weights1_used.sum(axis=-1).unsqueeze(-1))
-    weights2_used=weights2_used/(weights2_used.sum(axis=-1).unsqueeze(-1))
     if original_dis_y:
         y1_used=one_dimension_indexing(y1_,index1,len(shape_batch))
         y2_used=one_dimension_indexing(y2_,index2,len(shape_batch))
@@ -453,6 +534,9 @@ def DataShifts(
         y2_used=tensorized(y2_used,Cuda)
     else:
         pass
+    #Normalize the weights.
+    weights1_used=weights1_used/(weights1_used.sum(axis=-1).unsqueeze(-1))
+    weights2_used=weights2_used/(weights2_used.sum(axis=-1).unsqueeze(-1))
     #Verify that eps is numeric.
     if isinstance(eps, float) or isinstance(eps, int):
         eps=float(eps)
@@ -461,8 +545,13 @@ def DataShifts(
     else:
         raise TypeError("Parameter 'eps' must be numeric.")
     #With preprocessing complete, run the DataShifts algorithm.
-    covariate_shift=W1_deb(x1_used, x2_used, weights1_used, weights2_used, eps=eps)
-    loss = SamplesLoss(loss="sinkhorn", p=1, blur=(eps)**(1/1), potentials=True, debias=False, scaling=(0.9)**(1/1))
+    if P==1:
+        covariate_shift=W1_deb(x1_used, x2_used, weights1_used, weights2_used, eps=eps)
+    elif P==2:
+        covariate_shift=W2_deb(x1_used, x2_used, weights1_used, weights2_used, eps=eps)
+    else:
+        raise ValueError("The value of 'P' can only be 1 or 2.")
+    loss = SamplesLoss(loss="sinkhorn", p=P, blur=(eps)**(1/P), potentials=True, debias=False, scaling=(0.9)**(1/P))
     g1,g2=loss(weights1_used, x1_used, weights2_used, x2_used)
     if len(shape_batch)==0 and g1.shape[0]==1:
         g1=g1.squeeze(0)
@@ -471,11 +560,19 @@ def DataShifts(
     g2_=LazyTensor(g2.unsqueeze(-2).unsqueeze(-1))
     weights1_used_=LazyTensor(weights1_used.unsqueeze(-1).unsqueeze(-1))
     weights2_used_=LazyTensor(weights2_used.unsqueeze(-2).unsqueeze(-1))
-    Cx=Euclidean_distance(x1_used,x2_used,KeOps=True)
+    Cx=Euclidean_distance(x1_used,x2_used,KeOps=True,p=P)
     Cy=Euclidean_distance(y1_used,y2_used,KeOps=True)    
     Pi=weights1_used_*(((g1_-Cx+g2_)/eps).exp())*weights2_used_
     concept_shift=(Pi*Cy).sum(axis=len(shape_batch)).sum(axis=len(shape_batch)).squeeze(-1)
-    return covariate_shift, concept_shift
+    if grad1_used is None and grad2_used is None:
+        return covariate_shift, concept_shift
+    else:
+        dir_d=directional_derivative(x1_used,x2_used,grad1_used,grad2_used)
+        if P==1:
+            covariate_factor=dir_d.max(axis=len(shape_batch)).max(axis=len(shape_batch))[0].squeeze(-1)
+        else:
+            covariate_factor=((Pi*(dir_d**2)).sum(axis=len(shape_batch)).sum(axis=len(shape_batch)).squeeze(-1))**(1/2)
+        return covariate_shift, concept_shift, covariate_factor
 
 def dA_Distance(x1, x2, clf):
     """
